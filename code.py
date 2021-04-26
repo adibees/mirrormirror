@@ -16,14 +16,23 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Sequential
-from keras.layers import Activation, Dense, Dropout, Embedding, Flatten, Conv1D, MaxPooling1D, LSTM
+from keras.layers import (
+    Activation,
+    Dense,
+    Dropout,
+    Embedding,
+    Flatten,
+    Conv1D,
+    MaxPooling1D,
+    LSTM,
+)
 from keras import utils
 from keras.callbacks import ReduceLROnPlateau, EarlyStopping
 
 # nltk
 import nltk
 from nltk.corpus import stopwords
-from  nltk.stem import SnowballStemmer
+from nltk.stem import SnowballStemmer
 
 # Word2vec
 import gensim
@@ -39,9 +48,11 @@ import pickle
 import itertools
 
 # Set log
-logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s : %(levelname)s : %(message)s", level=logging.INFO
+)
 
-nltk.download('stopwords')
+nltk.download("stopwords")
 
 # DATASET
 DATASET_COLUMNS = ["target", "ids", "date", "flag", "user", "text"]
@@ -51,7 +62,7 @@ TRAIN_SIZE = 0.8
 # TEXT CLENAING
 TEXT_CLEANING_RE = "@\S+|https?:\S+|http?:\S|[^A-Za-z0-9]+"
 
-# WORD2VEC 
+# WORD2VEC
 W2V_SIZE = 300
 W2V_WINDOW = 7
 W2V_EPOCH = 32
@@ -75,12 +86,18 @@ TOKENIZER_MODEL = "tokenizer.pkl"
 ENCODER_MODEL = "encoder.pkl"
 
 
-#dataset_filename = os.listdir("../input")[0]
-#dataset_path = os.path.join("..","input",dataset_filename)
-#print("Open file:", dataset_path)
-df = pd.read_csv('training.1600000.processed.noemoticon.csv', encoding =DATASET_ENCODING , names=DATASET_COLUMNS)
+# dataset_filename = os.listdir("../input")[0]
+# dataset_path = os.path.join("..","input",dataset_filename)
+# print("Open file:", dataset_path)
+df = pd.read_csv(
+    "training.1600000.processed.noemoticon.csv",
+    encoding=DATASET_ENCODING,
+    names=DATASET_COLUMNS,
+)
 
 decode_map = {0: "NEGATIVE", 2: "NEUTRAL", 4: "POSITIVE"}
+
+
 def decode_sentiment(label):
     return decode_map[int(label)]
 
@@ -90,9 +107,10 @@ df.target = df.target.apply(lambda x: decode_sentiment(x))
 stop_words = stopwords.words("english")
 stemmer = SnowballStemmer("english")
 
+
 def preprocess(text, stem=False):
     # Remove link,user and special characters
-    text = re.sub(TEXT_CLEANING_RE, ' ', str(text).lower()).strip()
+    text = re.sub(TEXT_CLEANING_RE, " ", str(text).lower()).strip()
     tokens = []
     for token in text.split():
         if token not in stop_words:
@@ -102,19 +120,19 @@ def preprocess(text, stem=False):
                 tokens.append(token)
     return " ".join(tokens)
 
+
 df.text = df.text.apply(lambda x: preprocess(x))
 
-df_train, df_test = train_test_split(df, test_size=1-TRAIN_SIZE, random_state=42)
+df_train, df_test = train_test_split(df, test_size=1 - TRAIN_SIZE, random_state=42)
 print("TRAIN size:", len(df_train))
 print("TEST size:", len(df_test))
 
 
-documents = [_text.split() for _text in df_train.text] 
+documents = [_text.split() for _text in df_train.text]
 
-w2v_model = gensim.models.word2vec.Word2Vec(vector_size=W2V_SIZE, 
-                                            window=W2V_WINDOW, 
-                                            min_count=W2V_MIN_COUNT, 
-                                            workers=8)
+w2v_model = gensim.models.word2vec.Word2Vec(
+    vector_size=W2V_SIZE, window=W2V_WINDOW, min_count=W2V_MIN_COUNT, workers=8
+)
 
 w2v_model.build_vocab(documents)
 
@@ -125,8 +143,12 @@ tokenizer.fit_on_texts(df_train.text)
 vocab_size = len(tokenizer.word_index) + 1
 print("Total words", vocab_size)
 
-x_train = pad_sequences(tokenizer.texts_to_sequences(df_train.text), maxlen=SEQUENCE_LENGTH)
-x_test = pad_sequences(tokenizer.texts_to_sequences(df_test.text), maxlen=SEQUENCE_LENGTH)
+x_train = pad_sequences(
+    tokenizer.texts_to_sequences(df_train.text), maxlen=SEQUENCE_LENGTH
+)
+x_test = pad_sequences(
+    tokenizer.texts_to_sequences(df_test.text), maxlen=SEQUENCE_LENGTH
+)
 
 labels = df_train.target.unique().tolist()
 labels.append(NEUTRAL)
@@ -138,48 +160,57 @@ encoder.fit(df_train.target.tolist())
 y_train = encoder.transform(df_train.target.tolist())
 y_test = encoder.transform(df_test.target.tolist())
 
-y_train = y_train.reshape(-1,1)
-y_test = y_test.reshape(-1,1)
+y_train = y_train.reshape(-1, 1)
+y_test = y_test.reshape(-1, 1)
 
-print("y_train",y_train.shape)
-print("y_test",y_test.shape)
+print("y_train", y_train.shape)
+print("y_test", y_test.shape)
 
 embedding_matrix = np.zeros((vocab_size, W2V_SIZE))
 for word, i in tokenizer.word_index.items():
-  if word in w2v_model.wv:
-    embedding_matrix[i] = w2v_model.wv[word]
+    if word in w2v_model.wv:
+        embedding_matrix[i] = w2v_model.wv[word]
 print(embedding_matrix.shape)
 
 
-embedding_layer = Embedding(vocab_size, W2V_SIZE, weights=[embedding_matrix], input_length=SEQUENCE_LENGTH, trainable=False)
+embedding_layer = Embedding(
+    vocab_size,
+    W2V_SIZE,
+    weights=[embedding_matrix],
+    input_length=SEQUENCE_LENGTH,
+    trainable=False,
+)
 
 
 model = Sequential()
 model.add(embedding_layer)
 model.add(Dropout(0.5))
 model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))
-model.add(Dense(1, activation='sigmoid'))
+model.add(Dense(1, activation="sigmoid"))
 
 model.summary()
 
-model.compile(loss='binary_crossentropy',
-              optimizer="adam",
-              metrics=['accuracy'])
+model.compile(loss="binary_crossentropy", optimizer="adam", metrics=["accuracy"])
 
 
-callbacks = [ ReduceLROnPlateau(monitor='val_loss', patience=5, cooldown=0),
-              EarlyStopping(monitor='val_acc', min_delta=1e-4, patience=5)]
+callbacks = [
+    ReduceLROnPlateau(monitor="val_loss", patience=5, cooldown=0),
+    EarlyStopping(monitor="val_acc", min_delta=1e-4, patience=5),
+]
 
-history = model.fit(x_train, y_train,
-                    batch_size=BATCH_SIZE,
-                    epochs=EPOCHS,
-                    validation_split=0.1,
-                    verbose=1,
-                    callbacks=callbacks)
+history = model.fit(
+    x_train,
+    y_train,
+    batch_size=BATCH_SIZE,
+    epochs=EPOCHS,
+    validation_split=0.1,
+    verbose=1,
+    callbacks=callbacks,
+)
 
 
 def sentiment(score, include_neutral=True):
-    if include_neutral:        
+    if include_neutral:
         label = NEUTRAL
         if score <= SENTIMENT_THRESHOLDS[0]:
             label = NEGATIVE
@@ -190,6 +221,7 @@ def sentiment(score, include_neutral=True):
     else:
         return NEGATIVE if score < 0.5 else POSITIVE
 
+
 def predict(text, include_neutral=True):
     start_at = time.time()
     # Tokenize text
@@ -199,16 +231,8 @@ def predict(text, include_neutral=True):
     # Decode sentiment
     label = sentiment(score, include_neutral=include_neutral)
 
-    return {"label": label, "score": float(score),
-       "elapsed_time": time.time()-start_at}  
-
-
-
-
-
-
-
-
-
-
-
+    return {
+        "label": label,
+        "score": float(score),
+        "elapsed_time": time.time() - start_at,
+    }

@@ -1,0 +1,16 @@
+twilio
+flask
+numpy
+pandas
+requests
+matplotlib
+keras
+scikit-learn
+nltk
+gensim
+scipy
+ipython
+jupyter
+sympy 
+nose
+black
