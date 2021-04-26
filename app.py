@@ -16,7 +16,7 @@ def get_bot_response():
     user_input = request.values.get("Body", "").lower()
     resp = MessagingResponse()
     msg = resp.message()
-    twily_response = sb.predict(user_input)
+    twily_response = cd.predict(user_input)
     msg.body(twily_response)
     return str(resp)
 
