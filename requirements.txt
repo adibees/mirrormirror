@@ -1,6 +1,5 @@
 twilio
 flask
-numpy
 pandas
 requests
 matplotlib
@@ -9,8 +8,7 @@ scikit-learn
 nltk
 gensim
 scipy
-ipython
-jupyter
 sympy 
-nose
 black
+gunicorn
+tensorflow-cpu
