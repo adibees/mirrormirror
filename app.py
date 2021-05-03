@@ -18,6 +18,7 @@ def get_bot_response():
     msg = resp.message()
     twily_response = cd.predict(user_input)
     msg.body(twily_response)
+    msg_sid = msg.sid
     return str(resp)
 
 
