@@ -65,23 +65,6 @@ def predict(text, include_neutral=True):
         else:
             return("Thanks for sharing :)")
 
-        
-def come_back(mood, keyword):
-    appt = Appointment(
-                mood=mood, 
-                keyword = keyword,
-                phone_number=form.data['phone_number'],
-                delta=form.data['delta'],
-                time=form.data['time'],
-                timezone=form.data['timezone']
-            )
-
-            appt.time = arrow.get(appt.time, appt.timezone).to('utc').naive
-
-            reminders.db.session.add(appt)
-            reminders.db.session.commit()
-            send_sms_reminder.apply_async(
-                args=[appt.id], eta=appt.get_notification_time())
             
 def neutral_short():
     return("Interesting...tell me more? If you don't want to, just say say 'No'")
